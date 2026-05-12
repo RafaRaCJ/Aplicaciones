@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Senderos para Sanar</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root { --bg: #1a1c20; --card: #252830; --accent: #8b5cf6; --text: #e2e8f0; --muted: #94a3b8; --success: #10b981; --warning: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 16px; padding-bottom: 80px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    h1 { font-size: 1.2rem; color: var(--accent); }
+    button { background: var(--card); color: var(--text); border: 1px solid #334155; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #334155; }
+    .search { width: 100%; padding: 10px; border-radius: 8px; background: var(--card); border: 1px solid #334155; color: var(--text); margin-bottom: 12px; }
+    .group { margin-bottom: 16px; }
+    .group h3 { color: var(--accent); font-size: 0.95rem; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .chart-btn { width: 100%; text-align: left; background: var(--card); border: none; padding: 10px; margin-bottom: 6px; border-radius: 6px; font-size: 0.9rem; display: flex; justify-content: space-between; }
+    .chart-btn.active { background: #4c1d95; border: 1px solid var(--accent); }
+    .session-panel { background: var(--card); padding: 12px; border-radius: 8px; margin-top: 12px; }
+    .session-panel label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+    .session-panel input, .session-panel textarea, .session-panel select { width: 100%; padding: 8px; background: #0f172a; border: 1px solid #334155; color: var(--text); border-radius: 6px; margin-bottom: 8px; }
+    .timer-display { font-size: 1.8rem; text-align: center; margin: 8px 0; font-variant-numeric: tabular-nums; }
+    .focus-mode { display: none; text-align: center; padding: 20px 0; }
+    body.focus-active .header, body.focus-active .search, body.focus-active .groups-container, body.focus-active .session-log { display: none; }
+    body.focus-active .focus-mode { display: block; }
+    .decreto { background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-style: italic; line-height: 1.4; border-left: 3px solid var(--accent); }
+    .sequence-box { background: #1e293b; padding: 10px; border-radius: 8px; margin: 8px 0; border: 1px solid var(--warning); display: none; }
+    .sequence-box.show { display: block; }
+    .sequence-title { color: var(--warning); font-size: 0.9rem; margin-bottom: 6px; font-weight: bold; }
+    .sequence-item { background: #0f172a; padding: 6px 8px; margin: 4px 0; border-radius: 4px; font-size: 0.85rem; border-left: 2px solid var(--accent); }
+    .btn-secondary { background: var(--warning); color: #1a1c20; border: none; font-weight: bold; }
+    .hidden { display: none; }
+    @media (max-width: 400px) { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>🌿 Senderos para Sanar</h1>
+    <button id="focusBtn" onclick="toggleFocus()">👁️ Enfoque</button>
+  </header>
+
+  <input type="text" id="search" class="search" placeholder="Buscar por nombre, número o palabra clave...">
+
+  <div class="groups-container" id="groupsContainer"></div>
+
+  <div class="session-panel">
+    <label>📝 Campo libre (Nombre / Iniciales / Código)</label>
+    <input type="text" id="clientField" placeholder="Ej: R.M. / Consultante 12">
+    
+    <label>🌀 Gráfico seleccionado</label>
+    <div id="selectedChartDisplay" style="color: var(--accent); margin-bottom: 8px; font-weight: bold;">Ninguno</div>
+
+    <button onclick="showSuggestedSequence()" class="btn-secondary" style="width:100%; margin-bottom:8px;">🔮 Ver Secuencia Sugerida</button>
+    
+    <div id="sequenceBox" class="sequence-box">
+      <div class="sequence-title">✨ Secuencia recomendada para esta intención:</div>
+      <div id="sequenceContent"></div>
+      <button onclick="applySequence()" style="margin-top:8px; width:100%;">Aplicar esta secuencia</button>
+    </div>
+
+    <label>⏱️ Tiempo (minutos)</label>
+    <div style="display:flex; gap:8px;">
+      <input type="number" id="timerInput" value="3" min="1" max="30">
+      <button onclick="startTimer()">Iniciar</button>
+      <button onclick="stopTimer()">Detener</button>
+    </div>
+    <div class="timer-display" id="timerDisplay">00:00</div>
+
+    <label>📓 Observaciones / Decreto personal</label>
+    <textarea id="notes" rows="3" placeholder="Lo que surge con el péndulo..."></textarea>
+
+    <label>🔑 Palabra de anclaje / Decreto de sesión</label>
+    <input type="text" id="anchorWord" placeholder="Ej: Flexibilidad, Gratitud, Confío en el flujo...">
+
+    <div style="display:flex; gap:8px; margin-top: 8px;">
+      <button onclick="saveSession()" style="flex:1; background: var(--success); border: none;">💾 Guardar</button>
+      <button onclick="exportSessions()" style="flex:1;">📤 Exportar</button>
+    </div>
+  </div>
+
+  <div class="focus-mode">
+    <div class="decreto">
+      "Desde el centro de mi ser, me alineo con mi Yo Superior. Que este espacio se limpie, que los gráficos actúen con precisión y amor, respetando el libre albedrío y el tiempo justo de quien recibe. Así es." ✨
+    </div>
+    <h2 id="focusChartName" style="color: var(--accent); margin: 12px 0;">Selecciona un gráfico</h2>
+    <div id="focusSequence" style="color: var(--warning); font-size: 0.9rem; margin: 8px 0;"></div>
+    <div class="timer-display" id="focusTimer">00:00</div>
+  </div>
+
+  <script>
+    const graficos = [
+      {id:1,nombre:"Desimpregnador",cat:"limpieza",desc:"Limpieza energética profunda. Elimina vibraciones dañinas y beneficiosas."},
+      {id:3,nombre:"Pirámide de Tao",cat:"limpieza",desc:"Filtra energías nocivas psíquicas/astrales/físicas. Armoniza entornos."},
+      {id:22,nombre:"Decágono Doble",cat:"limpieza",desc:"Limpia y purifica energías cuando la persona no está bien."},
+      {id:54,nombre:"Dispersor de ondas P. Gerula I",cat:"limpieza",desc:"Anula zonas patógenas. Neutraliza cruces de redes hasta 50m."},
+      {id:55,nombre:"Dispersador de ondas P. Gerula II",cat:"limpieza",desc:"Dispersa por ondas de forma. Neutraliza redes hasta 100m."},
+      {id:25,nombre:"Once Círculos",cat:"proteccion",desc:"Protección espiritual y psíquica. Ideal para terapeutas."},
+      {id:26,nombre:"Nueve Círculos",cat:"proteccion",desc:"Protección material y energética. Casas, vehículos, viajes."},
+      {id:27,nombre:"Luxor",cat:"proteccion",desc:"Protección, cura e intuición. Minimiza ondas nocivas del subsuelo."},
+      {id:28,nombre:"Keiti",cat:"proteccion",desc:"Neutraliza energías de aparatos electromagnéticos."},
+      {id:29,nombre:"Escudo Mágico",cat:"proteccion",desc:"Pentáculo contra acción mágica voluntaria e involuntaria."},
+      {id:30,nombre:"Anti-Envidia",cat:"proteccion",desc:"Contra envidia y pensamientos destructivos."},
+      {id:37,nombre:"Cruz Cósmica",cat:"proteccion",desc:"Protección general. Ideal para preguntas al péndulo."},
+      {id:41,nombre:"Triángulo Sagrado",cat:"proteccion",desc:"Protección y aviso ante magia o situaciones peligrosas."},
+      {id:44,nombre:"Psico-Protector",cat:"proteccion",desc:"Contra ataques psíquicos. Equilibrio psicológico/físico."},
+      {id:47,nombre:"IAVE",cat:"proteccion",desc:"Neutraliza ondas de magia ritual."},
+      {id:48,nombre:"Anti-Magia",cat:"proteccion",desc:"Neutraliza ondas de magia y energías negativas."},
+      {id:49,nombre:"Escudo Bouclier",cat:"proteccion",desc:"Protección antimagia. Autodefensa psíquica."},
+      {id:50,nombre:"Trígono",cat:"proteccion",desc:"Protección personal y en viajes. Prosperidad."},
+      {id:53,nombre:"Ojo de Horus",cat:"proteccion",desc:"Protección egipcia. Sabiduría, salud y prosperidad."},
+      {id:2,nombre:"S.O.S Salud",cat:"salud",desc:"Emergencias, urgencias, traslados, accidentes."},
+      {id:4,nombre:"Figura Humana",cat:"salud",desc:"Equilibrio de polaridades opuestas."},
+      {id:5,nombre:"Equilibrar Hormonas",cat:"salud",desc:"Equilibra el sistema hormonal."},
+      {id:6,nombre:"Eliminar Estrés",cat:"salud",desc:"Elimina el estrés del sistema nervioso."},
+      {id:8,nombre:"Anti-Gripe",cat:"salud",desc:"Previene y cura gripe. Refuerza inmunidad."},
+      {id:9,nombre:"Cruz de San Mauro",cat:"salud",desc:"Emisiones en salud. Tradicional: resfriados, dolor de espalda."},
+      {id:10,nombre:"Rejuvenecedor",cat:"salud",desc:"Potencia buena salud, retarda envejecimiento."},
+      {id:11,nombre:"Revitalizador de Chakras",cat:"salud",desc:"Actúa en chakras, vitalidad y curación."},
+      {id:13,nombre:"Regulador Hormonal",cat:"salud",desc:"Armoniza glándulas hormonales."},
+      {id:14,nombre:"Regulador Intestinal",cat:"salud",desc:"Regulariza función intestinal."},
+      {id:15,nombre:"Dinamizador del Hígado",cat:"salud",desc:"Re-sintoniza hígado debilitado."},
+      {id:16,nombre:"Eliminador de Rayos Nocivos",cat:"salud",desc:"Elimina selectivamente rayos nocivos."},
+      {id:17,nombre:"Anti-Fatiga",cat:"salud",desc:"Para cansancio, sueño pobre o estrés."},
+      {id:18,nombre:"Alta Vitalidad",cat:"salud",desc:"Influencia cósmica revitalizante. Energizante."},
+      {id:19,nombre:"Anti-Dolor",cat:"salud",desc:"Gráfico para dolores en general."},
+      {id:20,nombre:"Programador Físico",cat:"salud",desc:"Reprograma salud perfecta desde la matriz."},
+      {id:21,nombre:"Columna Vertebral",cat:"salud",desc:"Cervical: flexibilidad. Torácica: postura. Lumbar: supervivencia."},
+      {id:31,nombre:"Laberinto de Amiens",cat:"salud",desc:"Restaura salud física/mental. Meditación."},
+      {id:33,nombre:"Diamante Solar",cat:"salud",desc:"Equilibrio físico/energético. Alivia dolores."},
+      {id:34,nombre:"Scap",cat:"salud",desc:"Neutraliza energías nocivas en todos los planos."},
+      {id:35,nombre:"André Philippe",cat:"salud",desc:"Uso similar a Scap."},
+      {id:36,nombre:"Neutralizador Electromagnético",cat:"salud",desc:"Para cajas de luz, enchufes, electrónicos."},
+      {id:12,nombre:"Antidepresivo",cat:"emocional",desc:"Supera la depresión. Pensamiento positivo."},
+      {id:23,nombre:"Armonía",cat:"emocional",desc:"Fraternización, armoniza intereses/afectos."},
+      {id:24,nombre:"Nombre Místico",cat:"emocional",desc:"Actúa sobre formas-pensamiento, mal de ojo."},
+      {id:39,nombre:"Para destrabar",cat:"emocional",desc:"Desenreda situaciones sin salida aparente."},
+      {id:40,nombre:"Triángulo Divino",cat:"emocional",desc:"Profundiza estado meditativo (alfa). Auto-comprensión."},
+      {id:42,nombre:"Cuadrado Mágico",cat:"emocional",desc:"Reequilibra ambientes saturados."},
+      {id:43,nombre:"Shin",cat:"emocional",desc:"Restaura componente vertical del cuerpo vital."},
+      {id:45,nombre:"Diafragma I",cat:"emocional",desc:"Corta energías negativas."},
+      {id:46,nombre:"Diafragma II",cat:"emocional",desc:"Complementa Diafragma I. Armoniza chakras."},
+      {id:32,nombre:"Éxito",cat:"potenciacion",desc:"Refuerza magnetismo personal y éxito."},
+      {id:38,nombre:"Espiral Cósmica",cat:"potenciacion",desc:"Éxito profesional, negocios, emprendimientos."},
+      {id:51,nombre:"Torbellino",cat:"potenciacion",desc:"Generador de positividad para bienes materiales."},
+      {id:52,nombre:"Torbellino con Sol",cat:"potenciacion",desc:"Pedidos materiales y prosperidad. Crecimiento espiritual."}
+    ];
+
+    const categorias = {
+      limpieza: "🌿 Limpieza y Purificación",
+      proteccion: "🛡️ Protección y Defensa Sutil",
+      salud: "💚 Salud Física y Vitalidad",
+      emocional: "🧠 Equilibrio Emocional y Mental",
+      potenciacion: "✨ Potenciación y Expansión"
+    };
+
+    const secuenciasSugeridas = {
+      limpieza: [
+        {id:1, nombre:"Desimpregnador", tiempo:"3 min", nota:"Limpieza profunda del campo"},
+        {id:25, nombre:"Once Círculos", tiempo:"2 min", nota:"Protección post-limpieza"},
+        {id:18, nombre:"Alta Vitalidad", tiempo:"3 min", nota:"Reposición energética"}
+      ],
+      proteccion: [
+        {id:25, nombre:"Once Círculos", tiempo:"3 min", nota:"Protección espiritual"},
+        {id:49, nombre:"Escudo Bouclier", tiempo:"2 min", nota:"Autodefensa psíquica"},
+        {id:37, nombre:"Cruz Cósmica", tiempo:"2 min", nota:"Sellado y equilibrio"}
+      ],
+      salud: [
+        {id:1, nombre:"Desimpregnador", tiempo:"2 min", nota:"Limpieza previa"},
+        {id:4, nombre:"Figura Humana", tiempo:"3 min", nota:"Equilibrio de polaridades"},
+        {id:18, nombre:"Alta Vitalidad", tiempo:"3 min", nota:"Revitalización"}
+      ],
+      emocional: [
+        {id:1, nombre:"Desimpregnador", tiempo:"2 min", nota:"Liberar cargas emocionales"},
+        {id:45, nombre:"Diafragma I", tiempo:"2 min", nota:"Cortar energías negativas"},
+        {id:23, nombre:"Armonía", tiempo:"3 min", nota:"Restaurar equilibrio interior"}
+      ],
+      potenciacion: [
+        {id:1, nombre:"Desimpregnador", tiempo:"2 min", nota:"Preparar el campo"},
+        {id:18, nombre:"Alta Vitalidad", tiempo:"3 min", nota:"Elevar vibración"},
+        {id:32, nombre:"Éxito", tiempo:"3 min", nota:"Potenciar magnetismo personal"}
+      ]
+    };
+
+    let timerInterval, selectedChart = null, currentSequence = [], isRunning = false;
+
+    function renderCharts() {
+      const container = document.getElementById('groupsContainer');
+      container.innerHTML = '';
+      Object.keys(categorias).forEach(cat => {
+        const group = document.createElement('div');
+        group.className = 'group';
+        group.innerHTML = `<h3>${categorias[cat]}</h3>`;
+        graficos.filter(g => g.cat === cat).forEach(g => {
+          const btn = document.createElement('button');
+          btn.className = 'chart-btn';
+          btn.innerHTML = `<span>#${g.id} ${g.nombre}</span><span style="color:var(--muted)">▾</span>`;
+          btn.onclick = () => selectChart(g, btn);
+          group.appendChild(btn);
+        });
+        container.appendChild(group);
+      });
+    }
+
+    function selectChart(g, btn) {
+      document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedChart = g;
+      document.getElementById('selectedChartDisplay').textContent = `#${g.id} ${g.nombre}`;
+      document.getElementById('focusChartName').textContent = `#${g.id} ${g.nombre}`;
+      document.getElementById('sequenceBox').classList.remove('show');
+      currentSequence = [];
+    }
+
+    function showSuggestedSequence() {
+      if(!selectedChart) return alert("Selecciona un gráfico primero.");
+      
+      const seq = secuenciasSugeridas[selectedChart.cat];
+      if(!seq) return;
+      
+      currentSequence = seq;
+      const content = document.getElementById('sequenceContent');
+      content.innerHTML = seq.map((s, i) => 
+        `<div class="sequence-item">
+          <strong>${i+1}. #${s.id} ${s.nombre}</strong><br>
+          <span style="color:var(--muted)">⏱️ ${s.tiempo} | ${s.nota}</span>
+        </div>`
+      ).join('');
+      
+      document.getElementById('sequenceBox').classList.add('show');
+      document.getElementById('focusSequence').textContent = seq.map(s => `#${s.id}`).join(' → ');
+    }
+
+    function applySequence() {
+      if(!currentSequence.length) return;
+      const firstChart = currentSequence[0];
+      const chartObj = graficos.find(g => g.id === firstChart.id);
+      if(chartObj) {
+        document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+        selectedChart = chartObj;
+        document.getElementById('selectedChartDisplay').textContent = `#${chartObj.id} ${chartObj.nombre} (Secuencia)`;
+        document.getElementById('timerInput').value = firstChart.tiempo.replace(' min','');
+        document.getElementById('sequenceBox').classList.remove('show');
+      }
+    }
+
+    function startTimer() {
+      stopTimer();
+      const mins = parseInt(document.getElementById('timerInput').value) || 3;
+      let sec = mins * 60;
+      isRunning = true;
+      timerInterval = setInterval(() => {
+        sec--;
+        const m = Math.floor(sec/60).toString().padStart(2,'0');
+        const s = (sec%60).toString().padStart(2,'0');
+        document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+        document.getElementById('focusTimer').textContent = `${m}:${s}`;
+        if(sec <= 0) {
+          stopTimer();
+          if('vibrate' in navigator) navigator.vibrate([400, 200, 400, 200, 400]);
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+      document.getElementById('timerDisplay').textContent = "00:00";
+      document.getElementById('focusTimer').textContent = "00:00";
+    }
+
+    function toggleFocus() {
+      document.body.classList.toggle('focus-active');
+      document.getElementById('focusBtn').textContent = document.body.classList.contains('focus-active') ? '🔍 Salir' : '👁️ Enfoque';
+    }
+
+    function saveSession() {
+      if(!selectedChart) return alert("Selecciona un gráfico primero.");
+      const session = {
+        date: new Date().toLocaleString(),
+        client: document.getElementById('clientField').value || "Sin identificar",
+        chart: selectedChart.nombre,
+        id: selectedChart.id,
+        time: document.getElementById('timerInput').value + " min",
+        notes: document.getElementById('notes').value,
+        anchorWord: document.getElementById('anchorWord').value,
+        sequence: currentSequence.length > 0 ? currentSequence.map(s => `#${s.id} ${s.nombre}`).join(' → ') : null
+      };
+      const sessions = JSON.parse(localStorage.getItem('senderos_sessions') || '[]');
+      sessions.unshift(session);
+      localStorage.setItem('senderos_sessions', JSON.stringify(sessions));
+      alert("✅ Sesión guardada localmente.");
+    }
+
+    function exportSessions() {
+      const sessions = JSON.parse(localStorage.getItem('senderos_sessions') || '[]');
+      if(!sessions.length) return alert("No hay sesiones guardadas.");
+      let txt = "🌿 SENDEROS PARA SANAR - REGISTRO DE SESIONES\n" + "=".repeat(50) + "\n\n";
+      sessions.forEach(s => {
+        txt += `📅 ${s.date}\n👤 ${s.client}\n🌀 Gráfico: #${s.id} ${s.chart} (${s.time})\n`;
+        if(s.sequence) txt += `🔮 Secuencia: ${s.sequence}\n`;
+        if(s.anchorWord) txt += `🔑 Palabra de anclaje: ${s.anchorWord}\n`;
+        txt += `📓 ${s.notes || "Sin notas"}\n${"-".repeat(50)}\n\n`;
+      });
+      const blob = new Blob([txt], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `senderos_sesiones_${new Date().toISOString().slice(0,10)}.txt`;
+      a.click();
+    }
+
+    document.getElementById('search').addEventListener('input', e => {
+      const term = e.target.value.toLowerCase();
+      document.querySelectorAll('.chart-btn').forEach(btn => {
+        const txt = btn.textContent.toLowerCase();
+        btn.style.display = txt.includes(term) ? 'flex' : 'none';
+      });
+    });
+
+    renderCharts();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
