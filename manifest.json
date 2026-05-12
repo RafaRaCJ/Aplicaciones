@@ -1,0 +1,16 @@
+{
+  "name": "Senderos para Sanar",
+  "short_name": "Senderos",
+  "description": "Herramienta de acompañamiento radiónico y sesión consciente",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a1c20",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2910/2910766.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
