@@ -6,7 +6,7 @@ Raíces y Alas · Constelaciones del Aprender
 Dibuja cada cuadro con Pillow, sintetiza una música ambiental con numpy
 y une todo con ffmpeg. Uso:
 
-    python3 generar_video.py [carpeta_salida] [--preview SEGUNDO]
+    python3 generar_video.py [carpeta_salida] [--preview SEGUNDO] [--voz]
 
 Sin dependencias externas de red: solo Pillow, numpy y ffmpeg.
 """
@@ -569,10 +569,53 @@ def make_music(seconds, path, sr=44100):
         wf.setnchannels(2); wf.setsampwidth(2); wf.setframerate(sr)
         wf.writeframes(pcm.tobytes())
 
+# ---------- Voz ----------
+VOZ = "--voz" in sys.argv
+VOICE_LEAD = 0.8
+VOZ_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voz")
+
+def voice_clips():
+    clips = []
+    for i in range(1, 15):
+        pth = os.path.join(VOZ_DIR, f"{i:02d}.mp3")
+        d = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                           "-of", "csv=p=0", pth]).decode().strip())
+        clips.append((pth, d))
+    return clips
+
+def mix_voice(music, clips, starts, total):
+    """Mezcla la voz sobre la música, bajando la música cuando hay voz."""
+    out = music.replace(".wav", "_mezcla.wav")
+    args = ["ffmpeg", "-y", "-loglevel", "error", "-i", music]
+    fc = []
+    for i, (pth, _) in enumerate(clips):
+        args += ["-i", pth]
+        ms = int((starts[i] + VOICE_LEAD) * 1000)
+        fc.append(f"[{i + 1}]aformat=sample_rates=44100:channel_layouts=stereo,adelay={ms}|{ms}[v{i}]")
+    n = len(clips)
+    fc.append("".join(f"[v{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0,apad,asplit[vo][key]")
+    fc.append("[0]volume=0.55[m]")
+    fc.append("[m][key]sidechaincompress=threshold=0.015:ratio=5:attack=150:release=1400[md]")
+    fc.append("[md][vo]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11")
+    args += ["-filter_complex", ";".join(fc), "-t", f"{total}", "-ar", "44100", out]
+    subprocess.run(args, check=True)
+    return out
+
 # ---------- Render ----------
 def main():
     bg = make_background()
     S = scenes()
+    voz = voice_clips() if VOZ else None
+    if voz:
+        # Cada escena dura lo que su narración (+ respiro) y los textos se reparten a ese ritmo
+        S2 = []
+        for (d, els), (path, vd) in zip(S, voz):
+            nd = max(d, VOICE_LEAD + vd + 1.8)
+            k = nd / d
+            for e in els:
+                e.t_in *= k
+            S2.append((nd, els))
+        S = S2
     total = sum(d for d, _ in S)
     starts, acc = [], 0.0
     for d, _ in S:
@@ -601,7 +644,11 @@ def main():
     print(f"Duración: {total:.0f} s · {int(total * FPS)} cuadros", flush=True)
     music = os.path.join(OUT, "musica.wav")
     make_music(total, music)
-    out = os.path.join(OUT, "neurodiversidad_raices_y_alas.mp4")
+    name = "neurodiversidad_raices_y_alas"
+    if voz:
+        music = mix_voice(music, voz, starts, total)
+        name += "_con_voz"
+    out = os.path.join(OUT, name + ".mp4")
     p = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
                           "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", music,
                           "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
