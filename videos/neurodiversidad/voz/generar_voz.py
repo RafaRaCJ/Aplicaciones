@@ -4,6 +4,8 @@ import json, sys, os, urllib.request
 VOICE = "VHyaoTFDjvUbd3uKFxA1"  # Rafael Carriel Jordan (voz clonada)
 KEY = os.environ.get("ELEVENLABS_API_KEY", "proxy-injected")
 here = os.path.dirname(os.path.abspath(__file__))
+if "--dir" in sys.argv:
+    j = sys.argv.index("--dir"); here = os.path.abspath(sys.argv[j + 1]); del sys.argv[j:j + 2]
 texts = json.load(open(os.path.join(here, "narracion.json")))
 only = [int(x) for x in sys.argv[1:]] or range(1, len(texts) + 1)
 for i in only:
